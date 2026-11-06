@@ -1,0 +1,13 @@
+# dependencies
+node_modules
+
+# build output
+.next
+*.tsbuildinfo
+
+# secrets (keep the empty template)
+.env*
+!.env.example
+
+# vercel
+.vercel
