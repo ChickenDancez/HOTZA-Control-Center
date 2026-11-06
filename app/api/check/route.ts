@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { audit, auditState } from '@/lib/audit';
 import { applyState } from '@/lib/alerts';
+import { runWatch, WATCH_COLUMNS, type WatchRow } from '@/lib/watch';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -37,7 +38,7 @@ export async function POST(req: NextRequest) {
 
     const { data: domain } = await db
       .from('domains')
-      .select('id,hostname,last_state')
+      .select(`id,hostname,last_state,${WATCH_COLUMNS}`)
       .eq('id', body.domain_id)
       .eq('owner_id', user.id)
       .single();
@@ -58,12 +59,18 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // SSL / domain expiry / nameservers run alongside the HTTP check.
+    const watch = runWatch(db, domain as unknown as WatchRow).catch(() => {
+      console.error('Watch failed');
+    });
+
     let result;
     try {
       result = await audit(domain.hostname);
     } catch {
       // Never leave the reserved row empty, and never store a raw error.
       await db.from('domain_checks').update({ issue: 'Check failed' }).eq('id', claimId);
+      await watch;
       return NextResponse.json({ error: 'Check failed' }, { status: 500 });
     }
 
@@ -74,6 +81,7 @@ export async function POST(req: NextRequest) {
       .eq('domain_id', domain.id);
     if (saveError) {
       console.error('Could not save audit result:', saveError.code);
+      await watch;
       return NextResponse.json({ error: 'Could not save check' }, { status: 500 });
     }
 
@@ -96,6 +104,7 @@ export async function POST(req: NextRequest) {
       result,
     );
 
+    await watch;
     return NextResponse.json({ ...result, state: state ?? 'unknown' });
   } catch {
     console.error('Check failed');

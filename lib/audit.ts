@@ -11,15 +11,36 @@ export type AuditResult = {
   redirects: RedirectHop[];
   issue: string | null;
   latency_ms: number;
+  method: 'HEAD' | 'GET';
 };
 const MAX_HOPS = 5;
 const CHECK_BUDGET_MS = 10000;
-function validHostname(host: string) {
+
+/**
+ * Some servers answer HEAD with 405/501. When true, the same hop is retried
+ * once with GET, and the response body is cancelled as soon as headers arrive:
+ * page content is never read or stored. Set to false for strict HEAD-only.
+ */
+const GET_FALLBACK_ON_405 = true;
+
+async function probe(url: URL, method: 'HEAD' | 'GET', timeoutMs: number) {
+  const res = await fetch(url.toString(), {
+    method,
+    redirect: 'manual',
+    cache: 'no-store',
+    signal: AbortSignal.timeout(timeoutMs),
+    headers: { 'user-agent': 'DomainHealthCheck/2.0' },
+  });
+  // Never read the body. Cancel the stream so no page content is downloaded.
+  await res.body?.cancel().catch(() => undefined);
+  return res;
+}
+export function validHostname(host: string) {
   return (
     host.length <= 253 && /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/.test(host)
   );
 }
-function publicIP(ip: string) {
+export function publicIP(ip: string) {
   if (isIP(ip) === 4) {
     const [a, b, c] = ip.split('.').map(Number);
     return !(
@@ -80,8 +101,9 @@ function safeError(error: unknown): string {
   return 'Network error';
 }
 /**
- * HTTPS-only, HEAD-only. No response bodies are fetched.
- * 405/501 means HEAD is unsupported: do not claim that a browser GET failed.
+ * HTTPS-only. HEAD first; on 405/501 one GET retry (see GET_FALLBACK_ON_405).
+ * Response bodies are never read. If both fail with 405/501, do not claim
+ * that a browser GET failed.
  * DNS is screened before each hop. For multi-tenant use, add DNS/IP pinning
  * to close the resolver-to-fetch rebinding window (see README).
  */
@@ -93,6 +115,7 @@ export async function audit(host: string): Promise<AuditResult> {
   let status_code: number | null = null;
   let issue: string | null = null;
   let finished = false;
+  let method: 'HEAD' | 'GET' = 'HEAD';
   for (let hop = 0; hop <= MAX_HOPS; hop++) {
     try {
       const remaining = deadline - Date.now();
@@ -110,13 +133,16 @@ export async function audit(host: string): Promise<AuditResult> {
         issue = 'Timeout';
         break;
       }
-      const res = await fetch(url.toString(), {
-        method: 'HEAD',
-        redirect: 'manual',
-        cache: 'no-store',
-        signal: AbortSignal.timeout(afterDNS),
-        headers: { 'user-agent': 'DomainHealthCheck/2.0' },
-      });
+      let res = await probe(url, 'HEAD', afterDNS);
+      if (GET_FALLBACK_ON_405 && (res.status === 405 || res.status === 501)) {
+        const afterHead = deadline - Date.now();
+        if (afterHead <= 500) {
+          issue = 'Timeout';
+          break;
+        }
+        res = await probe(url, 'GET', afterHead);
+        method = 'GET';
+      }
       status_code = res.status;
       if ([301, 302, 303, 307, 308].includes(res.status)) {
         if (hop >= MAX_HOPS) {
@@ -151,7 +177,14 @@ export async function audit(host: string): Promise<AuditResult> {
     }
   }
   if (!finished && !issue) issue = 'Redirect chain too long';
-  return { status_code, final_url: current, redirects, issue, latency_ms: Date.now() - started };
+  return {
+    status_code,
+    final_url: current,
+    redirects,
+    issue,
+    latency_ms: Date.now() - started,
+    method,
+  };
 }
 export function auditState(result: AuditResult): 'ok' | 'issue' | null {
   if (result.status_code === 405 || result.status_code === 501) return null;

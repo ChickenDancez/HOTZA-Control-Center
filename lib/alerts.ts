@@ -3,7 +3,7 @@ import type { AuditResult } from '@/lib/audit';
 
 type State = 'ok' | 'issue';
 
-function escapeHTML(value: string) {
+export function escapeHTML(value: string) {
   return value.replace(
     /[&<>"']/g,
     (ch) =>
@@ -17,7 +17,7 @@ function escapeHTML(value: string) {
   );
 }
 
-async function notifyTelegram(message: string) {
+export async function notifyTelegram(message: string) {
   // Server-only secrets. Never prefix these with NEXT_PUBLIC_.
   const token = process.env.TELEGRAM_BOT_TOKEN;
   const chatId = process.env.TELEGRAM_CHAT_ID;

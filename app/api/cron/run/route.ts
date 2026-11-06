@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { audit, auditState } from '@/lib/audit';
 import { applyState } from '@/lib/alerts';
+import { runWatch, WATCH_COLUMNS, type WatchRow } from '@/lib/watch';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -36,7 +37,7 @@ export async function GET(req: NextRequest) {
   const cutoff = new Date(Date.now() - MIN_INTERVAL_MS).toISOString();
   const { data: domains, error } = await db
     .from('domains')
-    .select('id,owner_id,hostname')
+    .select(`id,owner_id,hostname,${WATCH_COLUMNS}`)
     .eq('monitoring_enabled', true)
     .or(`last_checked_at.is.null,last_checked_at.lt.${cutoff}`)
     .order('last_checked_at', { ascending: true, nullsFirst: true })
@@ -61,7 +62,12 @@ export async function GET(req: NextRequest) {
     if (claimError || !claimed || claimed.length !== 1) continue;
     const previous = claimed[0].last_state as 'ok' | 'issue' | null;
 
-    const result = await audit(domain.hostname);
+    const [result] = await Promise.all([
+      audit(domain.hostname),
+      runWatch(db, domain as unknown as WatchRow).catch(() => {
+        console.error('Watch failed');
+      }),
+    ]);
     const state = auditState(result);
 
     const { error: insertError } = await db.from('domain_checks').insert({
