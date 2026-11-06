@@ -28,10 +28,31 @@ const navigation = [
 function time(d: string) {
   return new Date(d).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' });
 }
+function daysLeft(iso: string | null) {
+  if (!iso) return null;
+  return Math.floor((new Date(iso).getTime() - Date.now()) / 86400000);
+}
+function levelClass(level: 'ok' | 'warn' | 'bad' | null) {
+  if (level === 'ok') return 'good';
+  if (level === 'warn') return 'warn';
+  if (level === 'bad') return 'bad';
+  return 'neutral';
+}
+function sslText(d: Domain) {
+  if (d.ssl_error) return d.ssl_error;
+  const days = daysLeft(d.ssl_expires_at);
+  if (days === null) return 'ยังไม่ตรวจ';
+  return days < 0 ? 'หมดอายุแล้ว' : `เหลือ ${days} วัน`;
+}
+function expiryText(d: Domain) {
+  const days = daysLeft(d.domain_expires_at);
+  if (days === null) return d.domain_error || 'ยังไม่ตรวจ';
+  return days < 0 ? 'หมดอายุแล้ว' : `เหลือ ${days} วัน`;
+}
 function status(c?: Check) {
   if (!c) return { name: 'ยังไม่ตรวจ', cls: 'neutral' };
   if (c.status_code === 405 || c.status_code === 501)
-    return { name: 'HEAD ไม่รองรับ / ยังสรุปไม่ได้', cls: 'neutral' };
+    return { name: 'เว็บไม่ตอบ HEAD / ยังสรุปไม่ได้', cls: 'neutral' };
   if (c.issue) return { name: 'ต้องตรวจสอบ', cls: 'bad' };
   return { name: 'ปกติ', cls: 'good' };
 }
@@ -153,6 +174,12 @@ export default function Dashboard() {
     } finally {
       setChecking(null);
     }
+  }
+  async function acknowledgeNs(d: Domain) {
+    if (!client) return;
+    const { error } = await client.from('domains').update({ ns_changed_at: null }).eq('id', d.id);
+    if (error) setMessage(error.message);
+    else await reload();
   }
   async function toggleMonitor(d: Domain) {
     if (!client) return;
@@ -456,6 +483,7 @@ export default function Dashboard() {
                           <th>ประเภท</th>
                           <th>ผลล่าสุด</th>
                           <th>ปลายทาง</th>
+                          <th>SSL / โดเมน / DNS</th>
                           <th>จัดการ</th>
                         </tr>
                       </thead>
@@ -469,7 +497,9 @@ export default function Dashboard() {
                               <td>
                                 <span className={'pill ' + status(c).cls}>{status(c).name}</span>
                                 {c?.status_code && (
-                                  <div className="muted">HEAD HTTP {c.status_code}</div>
+                                  <div className="muted">
+                                    {c.method ?? 'HEAD'} HTTP {c.status_code}
+                                  </div>
                                 )}
                                 {c?.issue && <div className="issue">{c.issue}</div>}
                               </td>
@@ -483,6 +513,39 @@ export default function Dashboard() {
                                 {Array.isArray(c?.redirects) ? (
                                   <div className="muted">{c.redirects.length} redirects</div>
                                 ) : null}
+                              </td>
+                              <td>
+                                <div className="watch-line">
+                                  <span className={'pill ' + levelClass(d.ssl_level)}>SSL</span>
+                                  <span className="muted">{sslText(d)}</span>
+                                </div>
+                                <div className="watch-line">
+                                  <span className={'pill ' + levelClass(d.expiry_level)}>
+                                    โดเมน
+                                  </span>
+                                  <span className="muted">{expiryText(d)}</span>
+                                </div>
+                                <div className="watch-line">
+                                  <span
+                                    className={
+                                      'pill ' +
+                                      (d.ns_changed_at ? 'warn' : d.ns_records ? 'good' : 'neutral')
+                                    }
+                                  >
+                                    NS
+                                  </span>
+                                  <span className="muted" title={d.ns_records?.join(', ') ?? ''}>
+                                    {d.ns_records?.length ? d.ns_records.join(', ') : 'ยังไม่ตรวจ'}
+                                  </span>
+                                </div>
+                                {d.ns_changed_at && (
+                                  <div className="issue">
+                                    NS เปลี่ยนเมื่อ {time(d.ns_changed_at)}{' '}
+                                    <button className="mini" onClick={() => void acknowledgeNs(d)}>
+                                      รับทราบ
+                                    </button>
+                                  </div>
+                                )}
                               </td>
                               <td>
                                 <div className="actions">

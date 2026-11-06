@@ -276,6 +276,22 @@ td.domain-name {
   background: #28354e;
   color: #bac8e2;
 }
+.pill.warn {
+  background: #4a3a17;
+  color: #ffd27a;
+}
+.watch-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+  white-space: nowrap;
+}
+.watch-line .muted {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 220px;
+}
 .info-row {
   display: grid;
   grid-template-columns: 1fr 1fr;

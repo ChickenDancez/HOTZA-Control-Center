@@ -20,6 +20,16 @@ export type Domain = {
   last_state: 'ok' | 'issue' | null;
   last_checked_at: string | null;
   monitoring_enabled: boolean;
+  ssl_expires_at: string | null;
+  ssl_issuer: string | null;
+  ssl_error: string | null;
+  ssl_level: 'ok' | 'warn' | 'bad' | null;
+  domain_expires_at: string | null;
+  registrar: string | null;
+  domain_error: string | null;
+  expiry_level: 'ok' | 'warn' | 'bad' | null;
+  ns_records: string[] | null;
+  ns_changed_at: string | null;
 };
 export type Check = {
   id: string;
@@ -30,6 +40,7 @@ export type Check = {
   redirects: RedirectHop[] | null;
   issue: string | null;
   latency_ms: number | null;
+  method?: 'HEAD' | 'GET';
 };
 export type Incident = {
   id: string;
