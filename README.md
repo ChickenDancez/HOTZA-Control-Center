@@ -1,3 +1,17 @@
+# HOTZA Control Center v0.1.2 — Dashboard TypeScript fix
+
+เวอร์ชันนี้เป็นโปรเจกต์ครบชุด (ไม่ใช่ไฟล์ patch) อัปโหลดไฟล์ทั้งหมดขึ้น GitHub repo เดิมได้โดยไม่ต้องสร้าง Supabase project ใหม่
+
+**สิ่งที่แก้:** `components/Dashboard.tsx` เปลี่ยนเงื่อนไขแสดงผล `redirects` ซึ่งเป็นชนิด `unknown` ให้ตรวจ `Array.isArray` และคืน JSX หรือ `null` อย่างชัดเจน เพื่อแก้ `Type unknown is not assignable to type ReactNode` ที่เกิดใน Vercel
+
+**การทดสอบ:** ตรวจสอบไฟล์และโครงสร้างโปรเจกต์แล้ว แต่ยังไม่ได้ยืนยัน `npm run build` เพราะสภาพแวดล้อมนี้ติดตั้ง dependencies ไม่สำเร็จ หาก Build มี error เพิ่ม ให้ใช้ logs ล่าสุดเป็นข้อมูลแก้ต่อ
+
+**อัปเดตผ่าน GitHub:** เปิด repository เดิม > Add file > Upload files > ลากไฟล์และโฟลเดอร์ *ภายใน* โปรเจกต์นี้ (ไม่สร้างโฟลเดอร์ครอบอีกชั้น) > Commit changes > ดู Vercel Deployment ล่าสุด
+
+**ฐานข้อมูลเดิม:** ไม่จำเป็นต้องรัน `schema.sql` ซ้ำหากติดตั้งไปแล้ว และไม่ต้องส่ง Supabase secret key ให้ใคร
+
+---
+
 # HOTZA Control Center — MVP v0.1
 
 ระบบเว็บส่วนตัวสำหรับบริหารรายการโดเมน ตรวจ HTTP/Redirect และบันทึกหลักฐานเว็บไซต์สวมรอย
