@@ -156,7 +156,13 @@ export async function audit(host: string): Promise<AuditResult> {
         }
         const next = new URL(location, url);
         if (!(await safeUrl(next))) {
-          issue = 'Redirect to unsafe destination';
+          // Record where it tried to go (never fetched), so the dashboard shows it.
+          redirects.push({ from: current, to: next.toString(), status: res.status });
+          current = next.toString();
+          issue =
+            next.protocol === 'http:'
+              ? 'Redirect to insecure HTTP (not https)'
+              : 'Redirect to unsafe destination';
           break;
         }
         redirects.push({ from: current, to: next.toString(), status: res.status });
