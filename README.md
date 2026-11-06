@@ -1,59 +1,58 @@
-# HOTZA Control Center v0.1.2 — Dashboard TypeScript fix
+# HOTZA Control Center v0.2
 
-เวอร์ชันนี้เป็นโปรเจกต์ครบชุด (ไม่ใช่ไฟล์ patch) อัปโหลดไฟล์ทั้งหมดขึ้น GitHub repo เดิมได้โดยไม่ต้องสร้าง Supabase project ใหม่
+แดชบอร์ดส่วนตัวสำหรับตรวจสถานะโดเมน (HEAD/HTTPS), เส้นทาง Redirect และบันทึกหลักฐานการสวมรอยเว็บไซต์
 
-**สิ่งที่แก้:** `components/Dashboard.tsx` เปลี่ยนเงื่อนไขแสดงผล `redirects` ซึ่งเป็นชนิด `unknown` ให้ตรวจ `Array.isArray` และคืน JSX หรือ `null` อย่างชัดเจน เพื่อแก้ `Type unknown is not assignable to type ReactNode` ที่เกิดใน Vercel
+## คู่มือติดตั้งภาษาไทย — ทำตามลำดับ
 
-**การทดสอบ:** ตรวจสอบไฟล์และโครงสร้างโปรเจกต์แล้ว แต่ยังไม่ได้ยืนยัน `npm run build` เพราะสภาพแวดล้อมนี้ติดตั้ง dependencies ไม่สำเร็จ หาก Build มี error เพิ่ม ให้ใช้ logs ล่าสุดเป็นข้อมูลแก้ต่อ
+1. **Supabase SQL Editor:** ถ้ามีฐานข้อมูล v0.1 อยู่แล้ว ให้รันเฉพาะ `supabase/migration-v0.2.sql` (รันซ้ำได้) ห้ามรัน `schema.sql` ทับเพื่อเริ่มใหม่ ข้อมูลเดิมและ RLS จะอยู่ครบ จากนั้นไปที่ Supabase → Authentication → Providers → Email เพื่อ **ปิดการเปิดสมัครบัญชีสาธารณะ** UI รุ่นนี้ไม่มีปุ่มสมัครแล้ว
+2. **GitHub:** แตก ZIP แล้วอัปโหลดไฟล์ทั้งหมดทับโครงเดิม โดยให้ `package.json`, `vercel.json` อยู่ root ของ Repo อย่าอัปโหลดไฟล์ `.env`/Secret. โปรเจกต์ Vercel ใช้ Next.js Preset และไม่กำหนด Output Directory เอง
+3. **Vercel → Settings → Environment Variables:** เพิ่มค่าตามตารางด้านล่างใน Production จากนั้น Deploy ใหม่ และดูที่ Settings → Cron Jobs / Logs ว่า `/api/cron/run` เรียกได้ Cron ตรวจไม่เกิน 10 โดเมนต่อรอบ และตั้งเวลา 15 นาที
+4. **Telegram:** สร้าง Bot ผ่าน BotFather ส่งข้อความถึง Bot หนึ่งครั้ง แล้วดู chat ID ผ่าน Telegram API (อย่าเผยแพร่ Token). ตั้งทั้งสองตัวแปรแล้ว Redeploy
+5. **ทดสอบ:** เปิดหน้า Domain เพิ่มโดเมนที่ควบคุมได้ กดตรวจเอง / เปิดหรือปิดเฝ้าระวัง ตรวจตาราง `domain_checks` และ Vercel Logs; ลองเรียก `/api/cron/run` โดยไม่ส่ง Authorization ต้องได้ HTTP 401
 
-**อัปเดตผ่าน GitHub:** เปิด repository เดิม > Add file > Upload files > ลากไฟล์และโฟลเดอร์ *ภายใน* โปรเจกต์นี้ (ไม่สร้างโฟลเดอร์ครอบอีกชั้น) > Commit changes > ดู Vercel Deployment ล่าสุด
+## Vercel Environment Variables
 
-**ฐานข้อมูลเดิม:** ไม่จำเป็นต้องรัน `schema.sql` ซ้ำหากติดตั้งไปแล้ว และไม่ต้องส่ง Supabase secret key ให้ใคร
+| ชื่อ | วิธีนำมาใส่ | ความลับ |
+|---|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase → Project Settings / API → Project URL | Public configuration |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase → API → anon/publishable key | Public; RLS must remain enabled |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase → Project Settings → API → service_role key | **SECRET: server-only** |
+| `CRON_SECRET` | สุ่มสตริงยาวอย่างน้อย 32 ตัวอักษร | **SECRET: server-only** |
+| `TELEGRAM_BOT_TOKEN` | Telegram BotFather | **SECRET: server-only** |
+| `TELEGRAM_CHAT_ID` | Chat ID ของห้องที่ต้องการแจ้งเตือน | Private config |
 
----
+เฉพาะสองค่าแรกมี `NEXT_PUBLIC_`. **อย่าใส่ `SUPABASE_SERVICE_ROLE_KEY` ใน browser**, ใน GitHub หรือในหน้าบันทึกเหตุการณ์
 
-# HOTZA Control Center — MVP v0.1
+## ทำไม HTTP 405 และปลายทาง .cc ถึงไม่ตรงกับเบราว์เซอร์?
 
-ระบบเว็บส่วนตัวสำหรับบริหารรายการโดเมน ตรวจ HTTP/Redirect และบันทึกหลักฐานเว็บไซต์สวมรอย
+HTTP `405 Method Not Allowed` หมายถึงเซิร์ฟเวอร์ปลายทางไม่ยอมรับวิธีตรวจ `HEAD` ที่โปรแกรมใช้อยู่ โดย **ไม่ได้พิสูจน์ว่าเบราว์เซอร์ซึ่งใช้ GET เข้าไม่ได้** ผลปลายทาง `.cc` ในประวัติเดิมหมายถึงปลายทางที่โปรแกรมได้สังเกตจาก HEAD ก่อนถูกหยุดที่ 405 ไม่ใช่ข้อยืนยันว่า redirect สำหรับ GET ไป `.cc`. ระบบ v0.2 แสดง `HEAD ไม่รองรับ / ยังสรุปไม่ได้` และ **ไม่แจ้งว่าโดเมนล่มเพียงเพราะ 405/501**. ตรวจ Redirect จริงด้วยการตรวจ Network ของเบราว์เซอร์ หรือค่ากฎ Redirect ของ Cloudflare ตามโดเมนที่ตนควบคุม
 
-## ทำงานได้ในรุ่นนี้
-- Supabase Email/Password Authentication
-- Private domains table + Row Level Security
-- เพิ่ม/ลบโดเมน และกำหนด primary / legacy / watch
-- คลิกตรวจ HTTPS HEAD, HTTP status และ redirect chain (สูงสุด 5 hops)
-- ประวัติผลตรวจใน Supabase
-- บันทึก incident หรือเว็บไซต์ต้องสงสัยพร้อม URL และบันทึกเหตุการณ์
-- Dashboard สรุปสถานะจริงจากข้อมูลที่บันทึก ไม่สร้างอันดับ Google จำลอง
+ตัวตรวจรุ่นนี้ใช้ HEAD เท่านั้น ไม่ดาวน์โหลด body ไม่สแกนเว็บไซต์อื่นโดยไม่ได้รับอนุญาต และไม่เปลี่ยน redirect/โดเมนอัตโนมัติ
 
-## ยังไม่รวมใน v0.1
-- เชื่อม Google Search Console OAuth (ต้องมี Google Cloud OAuth credentials และการอนุญาตเข้าถึง Property)
-- ตรวจอันดับคำค้นหาแบบสด (Search Console ไม่มีข้อมูลเรียลไทม์)
-- ตรวจภาพเว็บไซต์สวมรอยอัตโนมัติ
-- Scheduled monitoring / alert notifications (รุ่นนี้กดตรวจเอง)
-- การแก้ไข DNS หรือเปลี่ยนโดเมนอัตโนมัติ
+## สิ่งที่ปรับปรุง v0.2
 
-## Setup
-1. สร้าง Supabase project > SQL Editor > วาง `supabase/schema.sql` แล้ว Run
-2. Authentication > Providers > Email เปิด Email/Password; หากเป็นระบบภายในให้ปิด public signups หลังสร้างบัญชีแอดมิน
-3. Copy `.env.example` เป็น `.env.local` ใส่ URL และ Supabase publishable (หรือ anon) key เท่านั้น ห้ามใส่ service_role key ฝั่ง client
-4. `npm install` และ `npm run dev`
-5. เปิด `http://localhost:3000` สมัคร/เข้าสู่ระบบ
-6. เมื่อพร้อมใช้งาน Push ไป GitHub และ Import project ใน Vercel เพิ่ม Environment Variables สองตัวเดิมและ Deploy
-7. ถ้าจะใช้ Cloudflare DNS ให้สร้าง CNAME สำหรับ subdomain แดชบอร์ด ไปยังโดเมน Vercel ตามคำแนะนำใน Vercel Domain settings และอย่าเปิดเผย keys อื่น
+- Login only; เพิ่ม `.gitignore` และแยก Audit logic ไป `lib/audit.ts`
+- จำกัดเวลารวมตรวจ 10 วินาที / 5 redirect hops
+- Postgres atomic RPC `claim_domain_check`: 1 ครั้ง / 60 วินาที / โดเมน, รวม 30 ครั้งต่อชั่วโมง / เจ้าของ (สำหรับตรวจด้วยมือ)
+- Cron ตรวจเป็นรอบ ไม่เกิน 10 โดเมนที่ยังเฝ้าระวังและถึงกำหนด ผ่าน `CRON_SECRET`
+- ส่ง Telegram เฉพาะการเปลี่ยนสถานะ known `ok` ↔ `issue` ไม่แจ้งครั้งแรกหรือ HEAD 405/501
+- ปุ่มเปิด/ปิดการเฝ้าระวังรายโดเมน
 
-## การรักษาความปลอดภัยและข้อจำกัด
-- RLS แยกข้อมูลตามบัญชี Supabase; ควรปิด Signup สาธารณะสำหรับระบบภายใน และเปิด MFA สำหรับแอดมินถ้ารองรับ
-- API ตรวจโดเมนใช้ Bearer session token และยืนยันการเป็นเจ้าของรายการในฐานข้อมูล
-- ตรวจเฉพาะ HTTPS HEAD ไม่ดึง HTML, ไม่ส่งข้อมูล login และไม่ bypass ระบบป้องกัน
-- มี DNS precheck ปฏิเสธ IP ส่วนตัว/loopback แต่ไม่ใช่ SSRF hardening ที่สมบูรณ์: สำหรับ production ที่เปิดสู่สาธารณะให้ใช้ allowlist โดเมนที่พิสูจน์สิทธิ์แล้วและ egress firewall/secure proxy เพื่อป้องกัน DNS rebinding
-- ตรวจได้ครั้งละ 1 โดเมนต่อคำสั่ง และพักอย่างน้อย 60 วินาทีต่อโดเมน (ควรเพิ่ม rate limit แบบรวมต่อบัญชีสำหรับ production)
-- ไม่มีการรับประกันอันดับ Google และไม่ใช้สำหรับการหลบเลี่ยงมาตรการค้นหาหรือข้อกฎหมาย
-- ข้อมูลที่เก็บคือ hostname, technical checks, incidents เท่านั้น ห้ามเก็บรหัสผ่านของลูกค้าหรือข้อมูลการเงินลงใน incident notes
+## ข้อควรระวังและข้อจำกัด
 
-## ขั้นต่อไปที่แนะนำ
-1. เพิ่ม Google Search Console OAuth แบบ read-only และ property mapping ตาม owner
-2. เพิ่ม scheduler ตรวจ DNS, TLS, redirect และ certificate expiry พร้อม notification
-3. เพิ่ม incident evidence uploads (Supabase private storage, signed access)
-4. เพิ่ม MFA, invite-only access, audit log, account-level rate limits, verified-domain allowlist
+- การตรวจแบบ HEAD ไม่ยืนยันผลการเปิดหน้าแบบ GET และ HTTP 403 อาจเกิดจาก Bot Protection; ระบุว่าเป็นปัญหาที่ต้องตรวจ ไม่ใช่สรุปว่าผู้ใช้เปิดไม่ได้
+- Cron และการตรวจด้วยมือยังเป็นคนละเส้นทางการจอง; หากเกิดพร้อมกันอาจบันทึกผลซ้ำได้ ระบบนี้ยังไม่เหมาะกับการสแกนถี่จำนวนมาก
+- การตรวจ DNS ก่อน fetch ยังมีความเสี่ยง DNS rebinding ระหว่างขั้นตอน resolve และ fetch; จึง **เหมาะกับโดเมนที่เจ้าของควบคุมเท่านั้น** ไม่ควรให้ผู้ใช้ทั่วไปเพิ่มปลายทางได้ก่อนทำ IP pinning ในตัวเชื่อมต่อ
+- บันทึก incident เฉพาะ URL/หลักฐานสาธารณะ ห้ามบันทึกรหัสผ่าน ข้อมูลการเงินหรือข้อมูลส่วนบุคคล
+- ระบบไม่ได้รับประกันอันดับ Google หรือทำให้โดเมนใหม่ติด Google ทันที
+- ถ้า Vercel Cron ไม่แสดงผล ให้ตรวจว่า plan รองรับ schedule นี้และตั้งค่า Secret ใน Production แล้ว
 
-**เทคโนโลยี:** Next.js App Router, TypeScript, Supabase, Vercel, Cloudflare DNS (optional)
+## ทดสอบที่ยังต้องทำหลัง Deploy
+
+- `npm run build` และ `npm run lint` บนเครื่องที่ติดตั้ง dependencies ได้
+- เปิด UI และทดสอบ login / add domain / toggle monitoring
+- Cron ที่ไม่ส่ง Bearer Secret ต้องได้ 401 และ cron ที่ถูกต้องต้องบันทึกผล
+- กดตรวจ 5 ครั้งพร้อมกัน เฉพาะครั้งแรกควรสำเร็จ ที่เหลือ 429
+- เตือน Telegram เมื่อ `ok` → `issue` และเมื่อ `issue` → `ok` เพียงครั้งเดียว
+
+ก่อนอัปเดตจริง ให้บันทึกสำเนาฐานข้อมูล Supabase หรือ snapshot schema ไว้ด้วย
