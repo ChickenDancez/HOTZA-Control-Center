@@ -17,7 +17,13 @@ import {
   ShieldCheck,
   Trash2,
 } from 'lucide-react';
-import { supabaseClient, type Domain, type Check, type Incident } from '@/lib/supabase';
+import {
+  supabaseClient,
+  type CTState,
+  type Domain,
+  type Check,
+  type Incident,
+} from '@/lib/supabase';
 import type { SupabaseClient, Session } from '@supabase/supabase-js';
 const navigation = [
   { id: 'overview', name: 'ภาพรวม', icon: Activity },
@@ -65,6 +71,8 @@ export default function Dashboard() {
   const [domains, setDomains] = useState<Domain[]>([]);
   const [checks, setChecks] = useState<Check[]>([]);
   const [incidents, setIncidents] = useState<Incident[]>([]);
+  const [ctState, setCtState] = useState<CTState | null>(null);
+  const [ctScanning, setCtScanning] = useState(false);
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState<string | null>(null);
@@ -97,6 +105,9 @@ export default function Dashboard() {
     setDomains(d.data || []);
     setChecks(c.data || []);
     setIncidents(i.data || []);
+    // Optional (v0.6 migration). Ignore errors so older databases still load.
+    const ct = await client.from('ct_state').select('*').maybeSingle();
+    setCtState(ct.error ? null : (ct.data as CTState | null));
   }
   useEffect(() => {
     if (session && client) void reload();
@@ -189,6 +200,33 @@ export default function Dashboard() {
       .eq('id', d.id);
     if (error) setMessage(error.message);
     else await reload();
+  }
+  async function runCtScan() {
+    if (!client) return;
+    setCtScanning(true);
+    setMessage('');
+    try {
+      const { data } = await client.auth.getSession();
+      const token = data.session?.access_token;
+      if (!token) throw new Error('กรุณาเข้าสู่ระบบใหม่');
+      const res = await fetch('/api/ct/scan', {
+        method: 'POST',
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || 'สแกนไม่สำเร็จ');
+      setMessage(
+        result.found.length
+          ? `พบเว็บชื่อคล้ายใหม่ ${result.found.length} รายการ`
+          : 'สแกนแล้ว ไม่พบชื่อใหม่',
+      );
+      await reload();
+    } catch (e) {
+      setMessage(e instanceof Error ? e.message : 'สแกนไม่สำเร็จ');
+      await reload();
+    } finally {
+      setCtScanning(false);
+    }
   }
   async function addIncident(e: React.FormEvent) {
     e.preventDefault();
@@ -588,6 +626,26 @@ export default function Dashboard() {
                   <p>เก็บหลักฐานไว้ตรวจสอบ ไม่ตัดสินว่าเป็นเว็บปลอมจากชื่อคล้ายอย่างเดียว</p>
                 </div>
               </div>
+              <section className="panel form-panel">
+                <h2>สแกนหาเว็บชื่อคล้าย (ทะเบียน SSL สาธารณะ)</h2>
+                <p className="muted">
+                  ค้นใบรับรอง SSL ที่มีชื่อแบรนด์ของเรา แต่ไม่ใช่โดเมนของเรา ระบบสแกนเองทุกวัน 09:00
+                  และไม่เปิดเว็บต้องสงสัยเอง
+                </p>
+                <div className="actions">
+                  <button className="mini" disabled={ctScanning} onClick={() => void runCtScan()}>
+                    {ctScanning ? 'กำลังสแกน (อาจนาน 1 นาที)...' : 'สแกนตอนนี้'}
+                  </button>
+                  <span className="muted">
+                    {ctState?.scanned_at
+                      ? `สแกนล่าสุด ${time(ctState.scanned_at)} · ` +
+                        (ctState.last_error
+                          ? `ไม่สำเร็จ: ${ctState.last_error}`
+                          : `พบใหม่ ${ctState.last_found ?? 0} รายการ`)
+                      : 'ยังไม่เคยสแกน'}
+                  </span>
+                </div>
+              </section>
               <section className="panel form-panel">
                 <h2>บันทึกเว็บไซต์ต้องสงสัย</h2>
                 <form onSubmit={addIncident} className="incident-form">
