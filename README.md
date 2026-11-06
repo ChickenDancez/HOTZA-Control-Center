@@ -12,14 +12,14 @@
 
 ## Vercel Environment Variables
 
-| ชื่อ | วิธีนำมาใส่ | ความลับ |
-|---|---|---|
-| `NEXT_PUBLIC_SUPABASE_URL` | Supabase → Project Settings / API → Project URL | Public configuration |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase → API → anon/publishable key | Public; RLS must remain enabled |
-| `SUPABASE_SERVICE_ROLE_KEY` | Supabase → Project Settings → API → service_role key | **SECRET: server-only** |
-| `CRON_SECRET` | สุ่มสตริงยาวอย่างน้อย 32 ตัวอักษร | **SECRET: server-only** |
-| `TELEGRAM_BOT_TOKEN` | Telegram BotFather | **SECRET: server-only** |
-| `TELEGRAM_CHAT_ID` | Chat ID ของห้องที่ต้องการแจ้งเตือน | Private config |
+| ชื่อ                            | วิธีนำมาใส่                                          | ความลับ                         |
+| ------------------------------- | ---------------------------------------------------- | ------------------------------- |
+| `NEXT_PUBLIC_SUPABASE_URL`      | Supabase → Project Settings / API → Project URL      | Public configuration            |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase → API → anon/publishable key                | Public; RLS must remain enabled |
+| `SUPABASE_SERVICE_ROLE_KEY`     | Supabase → Project Settings → API → service_role key | **SECRET: server-only**         |
+| `CRON_SECRET`                   | สุ่มสตริงยาวอย่างน้อย 32 ตัวอักษร                    | **SECRET: server-only**         |
+| `TELEGRAM_BOT_TOKEN`            | Telegram BotFather                                   | **SECRET: server-only**         |
+| `TELEGRAM_CHAT_ID`              | Chat ID ของห้องที่ต้องการแจ้งเตือน                   | Private config                  |
 
 เฉพาะสองค่าแรกมี `NEXT_PUBLIC_`. **อย่าใส่ `SUPABASE_SERVICE_ROLE_KEY` ใน browser**, ใน GitHub หรือในหน้าบันทึกเหตุการณ์
 
