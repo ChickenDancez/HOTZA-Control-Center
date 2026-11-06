@@ -13,9 +13,10 @@ export type WatchRow = {
   expiry_level: Level | null;
   ns_records: string[] | null;
   domain_checked_at: string | null;
+  seo_warning: string | null;
 };
 
-export const WATCH_COLUMNS = 'ssl_level,expiry_level,ns_records,domain_checked_at';
+export const WATCH_COLUMNS = 'ssl_level,expiry_level,ns_records,domain_checked_at,seo_warning';
 
 const SSL_WARN_DAYS = 14;
 const DOMAIN_WARN_DAYS = 30;
@@ -145,4 +146,23 @@ export async function runWatch(db: SupabaseClient, row: WatchRow) {
   }
 
   for (const m of messages) await notifyTelegram(`${m}\nเวลา: ${at}`);
+}
+
+/**
+ * Saves the latest SEO hint on the domain and alerts when it appears or changes,
+ * and once more when it clears.
+ */
+export async function applySeo(db: SupabaseClient, row: WatchRow, warning: string | null) {
+  if ((row.seo_warning ?? null) === warning) return;
+  const { error } = await db.from('domains').update({ seo_warning: warning }).eq('id', row.id);
+  if (error) {
+    console.error('Could not save SEO warning:', error.code);
+    return;
+  }
+  const name = escapeHTML(row.hostname);
+  const at = new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' });
+  const text = warning
+    ? `🟡 <b>SEO เทคนิค ${name}</b>\n${escapeHTML(warning)}`
+    : `🟢 <b>SEO เทคนิค ${name}</b>\nปัญหา redirect / noindex หายแล้ว`;
+  await notifyTelegram(`${text}\nเวลา: ${at}`);
 }

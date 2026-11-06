@@ -280,6 +280,11 @@ td.domain-name {
   background: #4a3a17;
   color: #ffd27a;
 }
+.seo-warn {
+  color: #ffd27a;
+  font-size: 12px;
+  margin-top: 4px;
+}
 .watch-line {
   display: flex;
   align-items: center;

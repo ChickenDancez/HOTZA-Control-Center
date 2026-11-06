@@ -1,10 +1,10 @@
-# HOTZA Control Center v0.4
+# HOTZA Control Center v0.5
 
 แดชบอร์ดส่วนตัวสำหรับตรวจสถานะโดเมน (HEAD/HTTPS), เส้นทาง Redirect และบันทึกหลักฐานการสวมรอยเว็บไซต์
 
 ## คู่มือติดตั้งภาษาไทย — ทำตามลำดับ
 
-1. **Supabase SQL Editor:** ถ้ามีฐานข้อมูล v0.1 อยู่แล้ว ให้รัน `supabase/migration-v0.2.sql` แล้ว `supabase/migration-v0.3.sql` แล้ว `supabase/migration-v0.4.sql` ตามลำดับ (รันซ้ำได้ทุกไฟล์) ห้ามรัน `schema.sql` ทับเพื่อเริ่มใหม่ ข้อมูลเดิมและ RLS จะอยู่ครบ จากนั้นไปที่ Supabase → Authentication → Providers → Email เพื่อ **ปิดการเปิดสมัครบัญชีสาธารณะ** UI รุ่นนี้ไม่มีปุ่มสมัครแล้ว
+1. **Supabase SQL Editor:** ถ้ามีฐานข้อมูล v0.1 อยู่แล้ว ให้รัน `supabase/migration-v0.2.sql` แล้ว `supabase/migration-v0.3.sql` แล้ว `supabase/migration-v0.4.sql` แล้ว `supabase/migration-v0.5.sql` ตามลำดับ (รันซ้ำได้ทุกไฟล์) ห้ามรัน `schema.sql` ทับเพื่อเริ่มใหม่ ข้อมูลเดิมและ RLS จะอยู่ครบ จากนั้นไปที่ Supabase → Authentication → Providers → Email เพื่อ **ปิดการเปิดสมัครบัญชีสาธารณะ** UI รุ่นนี้ไม่มีปุ่มสมัครแล้ว
 2. **GitHub:** แตก ZIP แล้วอัปโหลดไฟล์ทั้งหมดทับโครงเดิม โดยให้ `package.json`, `vercel.json` อยู่ root ของ Repo อย่าอัปโหลดไฟล์ `.env`/Secret. โปรเจกต์ Vercel ใช้ Next.js Preset และไม่กำหนด Output Directory เอง
 3. **Vercel → Settings → Environment Variables:** เพิ่มค่าตามตารางด้านล่างใน Production จากนั้น Deploy ใหม่ และดูที่ Settings → Cron Jobs / Logs ว่า `/api/cron/run` เรียกได้ Cron ตรวจไม่เกิน 10 โดเมนต่อรอบ และตั้งเวลา 15 นาที
 4. **Telegram:** สร้าง Bot ผ่าน BotFather ส่งข้อความถึง Bot หนึ่งครั้ง แล้วดู chat ID ผ่าน Telegram API (อย่าเผยแพร่ Token). ตั้งทั้งสองตัวแปรแล้ว Redeploy
@@ -28,6 +28,11 @@
 HTTP `405 Method Not Allowed` หมายถึงเซิร์ฟเวอร์ปลายทางไม่ยอมรับวิธีตรวจ `HEAD` ที่โปรแกรมใช้อยู่ โดย **ไม่ได้พิสูจน์ว่าเบราว์เซอร์ซึ่งใช้ GET เข้าไม่ได้** ผลปลายทาง `.cc` ในประวัติเดิมหมายถึงปลายทางที่โปรแกรมได้สังเกตจาก HEAD ก่อนถูกหยุดที่ 405 ไม่ใช่ข้อยืนยันว่า redirect สำหรับ GET ไป `.cc`. ระบบ v0.2 แสดง `HEAD ไม่รองรับ / ยังสรุปไม่ได้` และ **ไม่แจ้งว่าโดเมนล่มเพียงเพราะ 405/501**. ตรวจ Redirect จริงด้วยการตรวจ Network ของเบราว์เซอร์ หรือค่ากฎ Redirect ของ Cloudflare ตามโดเมนที่ตนควบคุม
 
 ตัวตรวจรุ่นนี้ใช้ HEAD เท่านั้น ไม่ดาวน์โหลด body ไม่สแกนเว็บไซต์อื่นโดยไม่ได้รับอนุญาต และไม่เปลี่ยน redirect/โดเมนอัตโนมัติ
+
+## สิ่งที่ปรับปรุง v0.5
+
+- **SEO เชิงเทคนิค (เตือนสีเหลือง ไม่นับเป็นเว็บล่ม):** redirect ชั่วคราว (302/303/307) ควรเป็น 301, redirect หลายทอด ควรชี้ตรงไปปลายทาง, และ header `X-Robots-Tag: noindex`
+- แจ้ง Telegram เมื่อคำเตือนปรากฏ เปลี่ยน หรือหายไป
 
 ## สิ่งที่ปรับปรุง v0.4
 
