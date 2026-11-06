@@ -54,3 +54,9 @@ export type Incident = {
   notes: string | null;
   created_at: string;
 };
+export type CTState = {
+  owner_id: string;
+  scanned_at: string | null;
+  last_error: string | null;
+  last_found: number | null;
+};

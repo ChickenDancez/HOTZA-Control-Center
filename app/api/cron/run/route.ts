@@ -4,6 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 import { audit, auditState } from '@/lib/audit';
 import { applyState } from '@/lib/alerts';
 import { applySeo, runWatch, WATCH_COLUMNS, type WatchRow } from '@/lib/watch';
+import { scanLookalikes } from '@/lib/ct';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -33,6 +34,27 @@ export async function GET(req: NextRequest) {
 
   // This privileged key must ONLY be used in this server-only cron route.
   const db = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+
+  // Daily job (vercel.json): lookalike-domain scan via Certificate Transparency.
+  if (req.nextUrl.searchParams.get('task') === 'ct') {
+    const { data: rows, error: loadError } = await db.from('domains').select('owner_id,hostname');
+    if (loadError) {
+      console.error('CT load failed:', loadError.code);
+      return NextResponse.json({ error: 'Could not read domain inventory' }, { status: 500 });
+    }
+    const byOwner = new Map<string, string[]>();
+    for (const r of rows ?? []) {
+      byOwner.set(r.owner_id, [...(byOwner.get(r.owner_id) ?? []), r.hostname]);
+    }
+    let scanned = 0;
+    let found = 0;
+    for (const [ownerId, hostnames] of byOwner) {
+      const result = await scanLookalikes(db, ownerId, hostnames);
+      if (result.ok) scanned++;
+      found += result.found.length;
+    }
+    return NextResponse.json({ owners: byOwner.size, scanned, found });
+  }
 
   const cutoff = new Date(Date.now() - MIN_INTERVAL_MS).toISOString();
   const { data: domains, error } = await db
