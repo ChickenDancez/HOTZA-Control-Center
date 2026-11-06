@@ -12,6 +12,8 @@ export type AuditResult = {
   issue: string | null;
   latency_ms: number;
   method: 'HEAD' | 'GET';
+  // Technical SEO hints (not downtime): temporary or chained redirects, noindex.
+  seo_warning: string | null;
 };
 const MAX_HOPS = 5;
 const CHECK_BUDGET_MS = 10000;
@@ -116,6 +118,7 @@ export async function audit(host: string): Promise<AuditResult> {
   let issue: string | null = null;
   let finished = false;
   let method: 'HEAD' | 'GET' = 'HEAD';
+  let noindex = false;
   for (let hop = 0; hop <= MAX_HOPS; hop++) {
     try {
       const remaining = deadline - Date.now();
@@ -174,6 +177,8 @@ export async function audit(host: string): Promise<AuditResult> {
       } else if (res.status >= 400) {
         issue = `HTTP ${res.status}`;
       }
+      const robots = res.headers.get('x-robots-tag') ?? '';
+      noindex = /noindex/i.test(robots);
       finished = true;
       break;
     } catch (error) {
@@ -184,6 +189,7 @@ export async function audit(host: string): Promise<AuditResult> {
   }
   if (!finished && !issue) issue = 'Redirect chain too long';
   return {
+    seo_warning: seoWarning(redirects, noindex),
     status_code,
     final_url: current,
     redirects,
@@ -191,6 +197,17 @@ export async function audit(host: string): Promise<AuditResult> {
     latency_ms: Date.now() - started,
     method,
   };
+}
+function seoWarning(redirects: RedirectHop[], noindex: boolean) {
+  const notes: string[] = [];
+  const temporary = redirects.filter(
+    (r) => r.status === 302 || r.status === 303 || r.status === 307,
+  );
+  if (temporary.length) notes.push(`Temporary redirect (${temporary[0].status}): use 301`);
+  if (redirects.length > 1)
+    notes.push(`Redirect chain: ${redirects.length} hops, point straight to the final URL`);
+  if (noindex) notes.push('X-Robots-Tag: noindex (Google will drop this page)');
+  return notes.length ? notes.join(' · ') : null;
 }
 export function auditState(result: AuditResult): 'ok' | 'issue' | null {
   if (result.status_code === 405 || result.status_code === 501) return null;

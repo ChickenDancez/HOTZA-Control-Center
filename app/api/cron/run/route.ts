@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { audit, auditState } from '@/lib/audit';
 import { applyState } from '@/lib/alerts';
-import { runWatch, WATCH_COLUMNS, type WatchRow } from '@/lib/watch';
+import { applySeo, runWatch, WATCH_COLUMNS, type WatchRow } from '@/lib/watch';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -87,6 +87,8 @@ export async function GET(req: NextRequest) {
       state,
       result,
     );
+
+    await applySeo(db, domain as unknown as WatchRow, result.seo_warning);
 
     checked++;
     if (state === 'issue') issues++;

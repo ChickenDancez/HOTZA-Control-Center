@@ -502,6 +502,7 @@ export default function Dashboard() {
                                   </div>
                                 )}
                                 {c?.issue && <div className="issue">{c.issue}</div>}
+                                {c?.seo_warning && <div className="seo-warn">{c.seo_warning}</div>}
                               </td>
                               <td className="cut">
                                 {c?.final_url || '—'}

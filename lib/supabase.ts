@@ -30,6 +30,7 @@ export type Domain = {
   expiry_level: 'ok' | 'warn' | 'bad' | null;
   ns_records: string[] | null;
   ns_changed_at: string | null;
+  seo_warning: string | null;
 };
 export type Check = {
   id: string;
@@ -41,6 +42,7 @@ export type Check = {
   issue: string | null;
   latency_ms: number | null;
   method?: 'HEAD' | 'GET';
+  seo_warning?: string | null;
 };
 export type Incident = {
   id: string;
