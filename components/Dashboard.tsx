@@ -672,7 +672,7 @@ export default function Dashboard() {
                 </p>
                 <div className="actions">
                   <button className="mini" disabled={ctScanning} onClick={() => void runCtScan()}>
-                    {ctScanning ? 'กำลังสแกน (อาจนาน 1 นาที)...' : 'สแกนตอนนี้'}
+                    {ctScanning ? 'กำลังสแกน (อาจนาน 1–3 นาที)...' : 'สแกนตอนนี้'}
                   </button>
                   <span className="muted">
                     {ctState?.scanned_at

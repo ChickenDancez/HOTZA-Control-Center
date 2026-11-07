@@ -4,8 +4,8 @@ import { scanLookalikes } from '@/lib/ct';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-// crt.sh can take 20-70 seconds to answer.
-export const maxDuration = 90;
+// crt.sh database, then website fallback, for each brand keyword.
+export const maxDuration = 240;
 
 const MIN_INTERVAL_MS = 10 * 60 * 1000;
 
