@@ -1,5 +1,5 @@
 -- Run in Supabase SQL Editor (fresh install only).
--- Then run migration-v0.2.sql through migration-v0.6.sql in order.
+-- Then run migration-v0.2.sql through migration-v0.7.sql in order.
 -- Require authenticated users and RLS on all tables.
 
 create extension if not exists pgcrypto;

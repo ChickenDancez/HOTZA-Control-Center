@@ -5,6 +5,7 @@ import { audit, auditState } from '@/lib/audit';
 import { applyState } from '@/lib/alerts';
 import { applySeo, runWatch, WATCH_COLUMNS, type WatchRow } from '@/lib/watch';
 import { scanLookalikes } from '@/lib/ct';
+import { runSerp } from '@/lib/serp';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -34,6 +35,25 @@ export async function GET(req: NextRequest) {
 
   // This privileged key must ONLY be used in this server-only cron route.
   const db = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+
+  // Daily job (vercel.json): Google search-results tracking via SerpApi.
+  if (req.nextUrl.searchParams.get('task') === 'serp') {
+    const { data: rows, error: loadError } = await db.from('domains').select('owner_id,hostname');
+    if (loadError) {
+      console.error('Search load failed:', loadError.code);
+      return NextResponse.json({ error: 'Could not read domain inventory' }, { status: 500 });
+    }
+    const byOwner = new Map<string, string[]>();
+    for (const r of rows ?? []) {
+      byOwner.set(r.owner_id, [...(byOwner.get(r.owner_id) ?? []), r.hostname]);
+    }
+    let ok = 0;
+    for (const [ownerId, hostnames] of byOwner) {
+      const runs = await runSerp(db, ownerId, hostnames);
+      ok += runs.filter((r) => r.ok).length;
+    }
+    return NextResponse.json({ owners: byOwner.size, ok });
+  }
 
   // Daily job (vercel.json): lookalike-domain scan via Certificate Transparency.
   if (req.nextUrl.searchParams.get('task') === 'ct') {
