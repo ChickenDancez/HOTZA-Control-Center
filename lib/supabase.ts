@@ -60,3 +60,19 @@ export type CTState = {
   last_error: string | null;
   last_found: number | null;
 };
+export type SerpResult = {
+  id: string;
+  owner_id: string;
+  keyword: string;
+  checked_at: string;
+  our_rank: number | null;
+  our_url: string | null;
+  suspicious: string[];
+  results: {
+    position: number;
+    domain: string;
+    link: string;
+    title: string;
+    kind: 'ours' | 'suspicious' | 'other';
+  }[];
+};

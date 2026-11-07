@@ -23,12 +23,14 @@ import {
   type Domain,
   type Check,
   type Incident,
+  type SerpResult,
 } from '@/lib/supabase';
 import type { SupabaseClient, Session } from '@supabase/supabase-js';
 const navigation = [
   { id: 'overview', name: 'ภาพรวม', icon: Activity },
   { id: 'domains', name: 'โดเมน', icon: Globe2 },
   { id: 'incidents', name: 'เว็บสวมรอย / เหตุการณ์', icon: ShieldCheck },
+  { id: 'search', name: 'ผลค้นหา Google', icon: Search },
   { id: 'history', name: 'ประวัติการตรวจสอบ', icon: History },
 ];
 function time(d: string) {
@@ -73,6 +75,8 @@ export default function Dashboard() {
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [ctState, setCtState] = useState<CTState | null>(null);
   const [ctScanning, setCtScanning] = useState(false);
+  const [serp, setSerp] = useState<SerpResult[]>([]);
+  const [serpRunning, setSerpRunning] = useState(false);
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState<string | null>(null);
@@ -108,6 +112,13 @@ export default function Dashboard() {
     // Optional (v0.6 migration). Ignore errors so older databases still load.
     const ct = await client.from('ct_state').select('*').maybeSingle();
     setCtState(ct.error ? null : (ct.data as CTState | null));
+    // Optional (v0.7 migration).
+    const sr = await client
+      .from('serp_results')
+      .select('*')
+      .order('checked_at', { ascending: false })
+      .limit(60);
+    setSerp(sr.error ? [] : ((sr.data ?? []) as SerpResult[]));
   }
   useEffect(() => {
     if (session && client) void reload();
@@ -117,6 +128,11 @@ export default function Dashboard() {
       setIncidents([]);
     }
   }, [session?.user.id, client]); // session refresh need not reload all lists
+  const serpLatest = useMemo(() => {
+    const map = new Map<string, SerpResult>();
+    for (const r of serp) if (!map.has(r.keyword)) map.set(r.keyword, r);
+    return [...map.values()];
+  }, [serp]);
   const latest = useMemo(() => {
     const map: Record<string, Check> = {};
     for (const c of checks) if (!map[c.domain_id]) map[c.domain_id] = c;
@@ -200,6 +216,28 @@ export default function Dashboard() {
       .eq('id', d.id);
     if (error) setMessage(error.message);
     else await reload();
+  }
+  async function runSerpCheck() {
+    if (!client) return;
+    setSerpRunning(true);
+    setMessage('');
+    try {
+      const { data } = await client.auth.getSession();
+      const token = data.session?.access_token;
+      if (!token) throw new Error('กรุณาเข้าสู่ระบบใหม่');
+      const res = await fetch('/api/serp/run', {
+        method: 'POST',
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || 'ตรวจไม่สำเร็จ');
+      setMessage('อัปเดตผลค้นหาแล้ว');
+      await reload();
+    } catch (e) {
+      setMessage(e instanceof Error ? e.message : 'ตรวจไม่สำเร็จ');
+    } finally {
+      setSerpRunning(false);
+    }
   }
   async function runCtScan() {
     if (!client) return;
@@ -733,6 +771,92 @@ export default function Dashboard() {
                   </div>
                 )}
               </section>
+            </>
+          )}
+          {tab === 'search' && (
+            <>
+              <div className="heading">
+                <div>
+                  <div className="eyebrow">SEARCH VISIBILITY</div>
+                  <h1>ผลค้นหา Google</h1>
+                  <p>
+                    หน้าแรกของ Google ประเทศไทย ตรวจเองทุกวัน 09:30 ผ่าน SerpApi
+                    ไม่เปิดเว็บต้องสงสัยเอง
+                  </p>
+                </div>
+                <button className="mini" disabled={serpRunning} onClick={() => void runSerpCheck()}>
+                  {serpRunning ? 'กำลังตรวจ...' : 'ตรวจตอนนี้'}
+                </button>
+              </div>
+              {serpLatest.length === 0 ? (
+                <section className="panel">
+                  <div className="empty">ยังไม่มีข้อมูล กด "ตรวจตอนนี้" หรือรอรอบ 09:30</div>
+                </section>
+              ) : (
+                serpLatest.map((r) => {
+                  const history = serp
+                    .filter((h) => h.keyword === r.keyword)
+                    .slice(0, 14)
+                    .reverse();
+                  return (
+                    <section className="panel" key={r.id}>
+                      <div className="panel-head">
+                        <div>
+                          <h2>คำค้น “{r.keyword}”</h2>
+                          <p>
+                            ตรวจล่าสุด {time(r.checked_at)} · อันดับเว็บเรา{' '}
+                            <b>{r.our_rank ?? 'ไม่ติดหน้าแรก'}</b>
+                            {r.suspicious.length > 0 &&
+                              ` · เว็บต้องสงสัย ${r.suspicious.length} รายการ`}
+                          </p>
+                          <p className="muted">
+                            ย้อนหลัง: {history.map((h) => h.our_rank ?? '–').join(' → ')}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="table-wrap">
+                        <table>
+                          <thead>
+                            <tr>
+                              <th>อันดับ</th>
+                              <th>โดเมน</th>
+                              <th>หัวข้อ</th>
+                              <th>ประเภท</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {r.results.map((h) => (
+                              <tr key={h.position + h.link}>
+                                <td>{h.position}</td>
+                                <td className="domain-name">{h.domain}</td>
+                                <td className="cut">{h.title}</td>
+                                <td>
+                                  <span
+                                    className={
+                                      'pill ' +
+                                      (h.kind === 'ours'
+                                        ? 'good'
+                                        : h.kind === 'suspicious'
+                                          ? 'bad'
+                                          : 'neutral')
+                                    }
+                                  >
+                                    {h.kind === 'ours'
+                                      ? 'เว็บเรา'
+                                      : h.kind === 'suspicious'
+                                        ? 'ต้องสงสัย'
+                                        : 'อื่น ๆ'}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </section>
+                  );
+                })
+              )}
             </>
           )}
           {tab === 'history' && (
